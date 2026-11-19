@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import dynamic from "next/dynamic";
+import ResultViewer, { type GenResult } from "./ResultViewer";
 import { PRESETS, PRESET_CATEGORIES, type Preset } from "@/lib/presets";
 
 const Viewer3D = dynamic(() => import("./Viewer3D"), { ssr: false });
@@ -15,7 +16,8 @@ export default function Studio() {
   const [sourceFile, setSourceFile] = useState<File | null>(null);
   const [sourcePreview, setSourcePreview] = useState<string | null>(null);
 
-  const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [result, setResult] = useState<GenResult | null>(null);
+  const resultUrl = result?.url ?? null;
   const [meshUrl, setMeshUrl] = useState<string | null>(null);
 
   const [generating, setGenerating] = useState(false);
@@ -84,7 +86,12 @@ export default function Studio() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Generation failed.");
-      setResultUrl(data.url);
+      setResult({
+        url: data.url,
+        prompt: finalPrompt,
+        mode: imageUrl ? "image" : "text",
+        model: "Flux Dev",
+      });
       setStatus("Render complete.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Generation failed.");
@@ -121,7 +128,7 @@ export default function Studio() {
     setActivePresets(new Set());
     setSourceFile(null);
     setSourcePreview(null);
-    setResultUrl(null);
+    setResult(null);
     setMeshUrl(null);
     setError(null);
     setStatus("Idle");
@@ -219,7 +226,7 @@ export default function Studio() {
             disabled={generating}
             className="w-full bg-amber-900/20 border border-amber-600/50 text-amber-500 py-3 font-bold text-[11px] uppercase tracking-widest hover:bg-amber-600/30 transition disabled:opacity-40"
           >
-            {generating ? "Generating..." : "Activate Q_Translation"}
+            {generating ? "Generating..." : "Activate Q"}
           </button>
           <button onClick={reset} className="btn-master w-full h-10 text-[9px]">
             New Session
@@ -228,7 +235,7 @@ export default function Studio() {
       </aside>
 
       {/* Canvas */}
-      <main className="flex-1 relative flex flex-col items-center justify-center p-12 bg-[#050505]">
+      <main className="flex-1 relative flex flex-col items-center justify-center p-8 pb-16 bg-[#050505]">
         {error && (
           <div className="absolute top-6 left-6 right-6 bg-red-950/60 border border-red-700 text-red-300 text-xs p-3 rounded">
             {error}
@@ -247,26 +254,13 @@ export default function Studio() {
           </p>
         )}
 
-        {resultUrl && !meshUrl && (
-          <div className="flex flex-col items-center gap-6">
-            <div
-              className="bg-[#12100e] shadow-[0_0_100px_black] overflow-hidden flex items-center justify-center"
-              style={{ width: 450, height: 600 }}
-            >
-              <img
-                src={resultUrl}
-                alt="Generated render"
-                className="w-full h-full object-contain"
-              />
-            </div>
-            <button
-              onClick={handleGenerate3D}
-              disabled={generating3D}
-              className="btn-master h-10 px-6 text-[10px]"
-            >
-              {generating3D ? "Building 3D mesh..." : "Convert to Real 3D Mesh"}
-            </button>
-          </div>
+        {result && !meshUrl && (
+          <ResultViewer
+            key={result.url}
+            result={result}
+            onConvert3D={handleGenerate3D}
+            converting3D={generating3D}
+          />
         )}
 
         {meshUrl && (
